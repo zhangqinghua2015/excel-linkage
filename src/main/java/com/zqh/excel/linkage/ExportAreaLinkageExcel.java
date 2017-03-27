@@ -20,11 +20,9 @@ public class ExportAreaLinkageExcel {
      * 创建带省市区街道四级联动名称管理器的excel
      *
      * @param provinces 省list
-     * @param citysList 市list
-     * @param countysList 区list
-     * @param streetsList 街道list
+     * @param regions 包含所有市、区、街道信息list，按父id排序
      */
-    public static void export(List<AreaInfo> provinces, List<List<AreaInfo>> citysList, List<List<AreaInfo>> countysList, List<List<AreaInfo>> streetsList) {
+    public static void export(List<AreaInfo> provinces, List<AreaInfo> regions) {
 
         // 创建一个excel
         Workbook book = new XSSFWorkbook();
@@ -92,36 +90,42 @@ public class ExportAreaLinkageExcel {
             }
         }
         // 设置市、区县、乡镇街道数据以及名称
-        List<List<List<AreaInfo>>> areaInfos = new ArrayList<List<List<AreaInfo>>>();
-        areaInfos.add(citysList);
-        areaInfos.add(countysList);
-        areaInfos.add(streetsList);
-        for (List<List<AreaInfo>> areaInfo : areaInfos) {
-            for (int i = 0; i < areaInfo.size(); i++) {
-                Row nameRow = hideSheet.createRow(rowId++);
-                Row valueRow = hideSheet.createRow(rowId++);
-                List<AreaInfo> areas = areaInfo.get(i);
-                for (int j = 0; j < areas.size(); j++) {
-                    Cell valueCell = valueRow.createCell(j);
-                    Cell nameCell = nameRow.createCell(j);
-                    nameCell.setCellValue(areas.get(j).getName());
-                    valueCell.setCellValue(areas.get(j).getId());
-                    if (j == areas.size() - 1) {
-                        rowIndex = (rowId - 1) + "";
-                        endColumnIndex = CellReference.convertNumToColString(valueCell.getColumnIndex());
-                        String nameStr = sheetName + "!$A$" + rowIndex + ":$" + endColumnIndex + "$" + rowIndex;//"Sheet2!$A$7:$AI$7"
-                        String valueStr = sheetName + "!$A$" + rowIndex + ":$" + endColumnIndex + "$" + rowId;
-                        // 添加名称
-                        Name name = book.createName();
-                        name.setNameName("_" + areas.get(j).getParentId());
-                        name.setRefersToFormula(nameStr);
-                        Name value = book.createName();
-                        value.setNameName("_" + areas.get(j).getParentId() + "Value");
-                        value.setRefersToFormula(valueStr);
-                    }
-                }
-            }
+        long parentId = -1;
+        int columnIndexNum = 0;
+        int endColumnIndexNum = 0;
+        Row nameRow = hideSheet.createRow(rowId++);
+        Row valueRow = hideSheet.createRow(rowId++);
+        Cell valueCell;
+        Cell nameCell;
+        for (AreaInfo areaInfo : regions) {
+        	// 父id相同的所有区域信息设置在同一行
+            if (parentId != -1 && parentId != areaInfo.getParentId()) {
+                // 添加上一行区域信息行的名称
+            	endColumnIndexNum = columnIndexNum - 1;
+            	rowIndex = (rowId - 1) + "";
+                endColumnIndex = CellReference.convertNumToColString(endColumnIndexNum);
+                String nameStr = sheetName + "!$A$" + rowIndex + ":$" + endColumnIndex + "$" + rowIndex;//"Sheet2!$A$7:$AI$7"
+                String valueStr = sheetName + "!$A$" + rowIndex + ":$" + endColumnIndex + "$" + rowId;
+                Name name = book.createName();
+            	name.setNameName("_" + parentId);
+                name.setRefersToFormula(nameStr);
+                Name value = book.createName();
+                value.setNameName("_" + parentId + "Value");
+                value.setRefersToFormula(valueStr);
+            	// 初始化下一行区域信息相关值
+            	nameRow = hideSheet.createRow(rowId++);
+            	valueRow = hideSheet.createRow(rowId++);
+            	columnIndexNum = 0;
+            } 
+            // 每个区域信息的名称与id值在同一列
+            valueCell = valueRow.createCell(columnIndexNum);
+            nameCell = nameRow.createCell(columnIndexNum++);
+            nameCell.setCellValue(areaInfo.getName());
+            valueCell.setCellValue(areaInfo.getId());
+            // 获取当前行区域信息的父id
+            parentId = areaInfo.getParentId();
         }
+        
         // 设置数据验证
         Row row1 = sheet1.createRow(1);
         row1.createCell(0).setCellValue("");
